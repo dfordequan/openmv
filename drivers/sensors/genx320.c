@@ -61,7 +61,7 @@
 
 #define I2C_TIMEOUT                     1000
 
-#define INTEGRATION_DEF_PREIOD          10000 // 20ms (50 FPS)
+#define INTEGRATION_DEF_PREIOD          20000 // 20ms (50 FPS)
 #define INTEGRATION_MIN_PREIOD          0x10 // 16us
 #define INTEGRATION_MAX_PREIOD          0x1FFF0 // 131056us
 

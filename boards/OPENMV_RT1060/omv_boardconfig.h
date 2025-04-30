@@ -78,7 +78,7 @@
 #define OMV_STACK_MEMORY                ITCM1   // stack memory
 #define OMV_STACK_SIZE                  (32K)
 #define OMV_JPEG_MEMORY                 DRAM    // JPEG buffer memory buffer.
-#define OMV_JPEG_SIZE                   (1M)    // IDE JPEG buffer (header + data).
+#define OMV_JPEG_SIZE                   (200K)    // IDE JPEG buffer (header + data).
 #define OMV_FB_MEMORY                   DRAM    // Framebuffer, fb_alloc
 #define OMV_FB_SIZE                     (13M)   // FB memory: header + VGA/GS image
 #define OMV_FB_ALLOC_SIZE               (10M)   // minimum fb alloc size
