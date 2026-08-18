@@ -1,0 +1,21 @@
+diff --git a/drivers/sensors/genx320.c b/drivers/sensors/genx320.c
+index 452c7f6c..40d65be4 100644
+--- a/drivers/sensors/genx320.c
++++ b/drivers/sensors/genx320.c
+@@ -629,12 +629,12 @@ static int match(omv_csi_t *csi, size_t id) {
+ }
+ 
+ static int post_process_histo(omv_csi_t *csi, image_t *image, uint32_t flags) {
+-    genx_state_t *genx = csi->priv;
+     size_t image_size = image->w * image->h;
+ 
+-    for (uint32_t i = 0; i < image_size; i++) {
+-        image->data[i] = __USAT((((int8_t *) image->data)[i] * genx->contrast) + genx->brightness, UINT8_T_BITS);
+-    }
++    // HISTO3D RAW PASSTHROUGH (custom deploy 2026-08-13): the sensor runs ALGO_HISTO3D with 4+4 bit
++    // splitting (ehc_control=0x03, bits_splitting=0x44), so each pixel byte packs ON=(byte>>4) and
++    // OFF=(byte&0x0F). Leave it RAW so the app can unpack the two channels -- the previous signed-int8
++    // contrast/brightness mangle clipped ON>=8 and merged the two polarities into one DIFF3D-ish value.
+ 
+     if (csi->color_palette && (framebuffer_get_buffer_size(csi->fb) >= (image_size * sizeof(uint16_t)))) {
+         for (int32_t i = image_size - 1; i >= 0; i--) {
