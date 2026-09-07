@@ -22,38 +22,28 @@ except ImportError:                        # per-frame ulab temps -> ~260B/frame
 MODEL = '/sdcard/ppo_headpen.bin'
 G, SRC = 64, 320; SC = G / SRC; KSTACK = 3
 UART_ID, BAUD = 4, 115200
-PERIOD = 70                               # ~14.3 Hz target (matches training). Loop WORK is now ~52ms
-# (copy-trick + framebuffers(4)), so PERIOD=70 paces to a steady 14.3 Hz with ~18ms margin (freeze-free).
-# Raw capability is ~19 Hz: set PERIOD=0 to run unpaced -- but the 3-frame stack is spaced at the decision
-# rate, so running faster than the trained 14.3 Hz changes the obs vs training (retrain if you want 20 Hz).
+PERIOD = 70                               # ~14.3 Hz target
 GC_EVERY = 2000 if _HAS_FS else 15         # framestack: churn ~0 -> collect rarely (safety); and the
 # custom fw's GC heap is 4M not 24M so a collect is ~63ms not ~610ms (no control freeze either way).
 VLEN = 4
 
 model = ml.Model(MODEL); print('ppo_headpen_main: model in', model.input_shape)
 _c = csi.CSI(cid=csi.GENX320); _c.reset()
-_c.pixformat(csi.GRAYSCALE); _c.framesize((SRC, SRC)); _c.framebuffers(4)   # 4 buffers: a freshly-
-# integrated frame is always ready, so snapshot returns it in ~15ms and the 20ms event integration
-# now OVERLAPS predict in the background (confirmed: ~2 frames complete per predict). fb 40.8/22/~15ms.
+_c.pixformat(csi.GRAYSCALE); _c.framesize((SRC, SRC)); _c.framebuffers(2)   # 2 = overlap readout/
+# integration -> snapshot 40.8->22ms (measured on-board 2026-09-01, no overflow w/ model loaded)
 _c.snapshot(time=800)
-_g = image.Image(G, G, image.GRAYSCALE)              # 64x64 AREA target (ulab-fallback path only)
-_warm = image.Image(SRC, SRC, image.GRAYSCALE)       # 320x320 cached scratch for the copy-trick (below)
+_g = image.Image(G, G, image.GRAYSCALE)
 
 _img = np.zeros((1, G, G, KSTACK))        # persistent; ch0=oldest ... ch(K-1)=newest
 _first = True
 def build_img():
     global _first
     d = _c.snapshot()
-    if _HAS_FS:                                                    # FAST path (custom fw): the COPY-TRICK.
-        # The camera framebuffer is UNCACHEABLE, so per-element M55 reads are ~10x slow (draw_image AREA
-        # 320->64 = 16ms; push_ds straight off the fb = 9.6ms). A BLOCK copy uses burst transfers (~0.7ms
-        # for 102KB) and push_ds on the CACHED copy is ~1.7ms -> ~2.4ms total (vs 16ms). Obs = plain 5x5
-        # box mean (differs from draw_image AREA by <=~3/255 -- negligible for this policy).
-        _warm.draw_image(d, 0, 0)                                          # 320->320 burst block copy (~0.7ms)
-        (framestack.fill_ds if _first else framestack.push_ds)(_img, _warm)  # fused box-downsample + stack (~1.7ms)
+    _g.draw_image(d, 0, 0, x_scale=SC, y_scale=SC, hint=image.AREA)
+    if _HAS_FS:                                                    # zero-alloc C path (custom fw)
+        (framestack.fill if _first else framestack.push)(_img, _g)  # fill=all channels (reset); push=shift+newest-last
         _first = False
-    else:                                                          # ulab fallback (stock fw): AREA + ulab shift
-        _g.draw_image(d, 0, 0, x_scale=SC, y_scale=SC, hint=image.AREA)
+    else:                                                          # ulab fallback (stock fw): allocates ~50KB/frame
         newf = np.array(np.frombuffer(_g.bytearray(), dtype=np.uint8), dtype=np.float).reshape((G, G))
         if _first:
             for i in range(KSTACK): _img[0, :, :, i] = newf
