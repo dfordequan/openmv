@@ -160,7 +160,9 @@
 #define OMV_GC_BLOCK0_MEMORY                SRAM2  // Main GC block
 #define OMV_GC_BLOCK0_SIZE                  (1M)
 #define OMV_GC_BLOCK1_MEMORY                DRAM   // Main GC block
-#define OMV_GC_BLOCK1_SIZE                  (24M)
+#define OMV_GC_BLOCK1_SIZE                  (4M)   // was 24M: gc.collect() sweeps the whole GC heap
+// (~610ms @24M in slow DRAM -> a ~0.6s control freeze). Model/tensors live in UMA (not here), and the
+// deploy app uses <300KB GC steady, so 4M is ample headroom while cutting the sweep to ~100ms.
 #define OMV_UMA_BLOCK0_MEMORY               DRAM   // Default UMA pool.
 #define OMV_UMA_BLOCK0_SIZE                 (31M)
 #define OMV_UMA_BLOCK0_FLAGS                (0)
